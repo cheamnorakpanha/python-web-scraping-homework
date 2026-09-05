@@ -3,3 +3,6 @@ beautifulsoup4
 selenium
 scrapling
 python-dotenv
+anyio
+curl-cffi
+playwright
