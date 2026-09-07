@@ -20,27 +20,22 @@ CATEGORIES = {
     "Software", "Security System"
 }
 
-count = 0
-
-
-def save_product(product):
-    os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
-
-    try:
-        with open(OUTPUT, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = []
-
-    data.append(product)
-
-    with open(OUTPUT, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
 
 class GoldOneSpider(Spider):
     name = "goldone"
     start_urls = ["https://www.goldonecomputer.com/"]
+
+    custom_settings = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._products = []
+        os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
+
+    def _flush(self):
+        """Write all buffered products to disk."""
+        with open(OUTPUT, "w", encoding="utf-8") as f:
+            json.dump(self._products, f, ensure_ascii=False, indent=4)
 
     def configure_sessions(self, manager):
         proxies = [
@@ -95,8 +90,6 @@ class GoldOneSpider(Spider):
             )
 
     async def parse_product(self, response: Response):
-        global count
-
         title = response.css(
             "h3.product-title::text"
         ).get("").strip()
@@ -141,15 +134,19 @@ class GoldOneSpider(Spider):
             "url": response.url
         }
 
-        save_product(product)
+        self._products.append(product)
 
-        count += 1
-        print(f"[{count}] Saved: {title}")
+        if len(self._products) % 10 == 0:
+            self._flush()
+            print(f"[{len(self._products)}] Batch saved to file...")
+        else:
+            print(f"[{len(self._products)}] Scraped: {title}")
 
         yield product
 
 
-GoldOneSpider().start()
+spider = GoldOneSpider()
+spider.start()
+spider._flush()  # final flush for any remaining items
 
-print(f"\nFinished! {count} products saved.")
-print(f"Saved to: {OUTPUT}")
+print(f"\nFinished! {len(spider._products)} products saved to: {OUTPUT}")
